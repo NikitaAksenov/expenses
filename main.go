@@ -63,7 +63,17 @@ func main() {
 		fs.BoolVar(&dateFlag, "date", false, dateFlagDesc)
 		fs.BoolVar(&dateFlag, "d", false, dateFlagDesc)
 
+		var dateFilledFlag string
+		dateFilledFlagDesc := "Sets expense date to this flag's value"
+		fs.StringVar(&dateFilledFlag, "datefilled", "", dateFilledFlagDesc)
+		fs.StringVar(&dateFilledFlag, "df", "", dateFilledFlagDesc)
+
 		fs.Parse(os.Args[2:])
+
+		if dateFlag && dateFilledFlag != "" {
+			fmt.Println("Can't have `date` and `datefilled` flags both present")
+			return
+		}
 
 		if multipleFlag {
 			fmt.Println("Adding expense entries")
@@ -93,10 +103,14 @@ func main() {
 			}
 
 			date := time.Now().UTC()
-			if dateFlag {
-				fmt.Print("Date:     ")
-				dateStr, _ := reader.ReadString('\n')
-				dateStr = strings.TrimSuffix(dateStr, "\r\n")
+			if dateFlag || dateFilledFlag != "" {
+				dateStr := dateFilledFlag
+
+				if dateFlag {
+					fmt.Print("Date:     ")
+					dateStr, _ = reader.ReadString('\n')
+					dateStr = strings.TrimSuffix(dateStr, "\r\n")
+				}
 
 				date, err = time.Parse(TimeFormatDateOnly, dateStr)
 				if err != nil {
@@ -104,6 +118,7 @@ func main() {
 					return
 				}
 			}
+
 			dateStr := date.Format(TimeFormatDateOnly)
 
 			_, err = db.Exec("insert into expenses (Name, Category, Value, Date, Created, Updated) values ($1, $2, $3, $4, $5, $5)",
@@ -330,8 +345,6 @@ func main() {
 
 		query += "\nORDER BY Date"
 		query += fmt.Sprintf("\nLIMIT %d", limitFlag)
-
-		fmt.Println(query)
 
 		rows, err := db.Query(query)
 		if err != nil {
