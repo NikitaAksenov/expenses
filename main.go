@@ -32,14 +32,18 @@ func main() {
 
 	reader := bufio.NewReader(os.Stdin)
 
+	args := os.Args[2:]
+
 	switch os.Args[1] {
 	case "add":
-		commands.CommandAdd(reader, os.Args[2:], db)
+		commands.CommandAdd(reader, args, db)
 	case "upd":
-		commands.CommandUpdate(reader, os.Args[2:], db)
+		commands.CommandUpdate(reader, args, db)
 	case "list":
-		commands.CommandList(reader, os.Args[2:], db)
+		commands.CommandList(reader, args, db)
 	case "del":
-		commands.CommandDelete(reader, os.Args[2:], db)
+		commands.CommandDelete(reader, args, db)
+	case "rep":
+		commands.CommandReport(reader, args, db)
 	}
 }
