@@ -38,43 +38,10 @@ func (app *application) init() error {
 
 	app.infoLogger.Println("Init app", app.appName)
 
-	dbPath, err := app.getDatabasePath()
+	err = app.setupDatabase(appDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup database: %w", err)
 	}
-
-	// Check if db exists
-	_, err = os.Stat(dbPath)
-	dbExists := !os.IsNotExist(err)
-
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		return err
-	}
-	err = db.Ping()
-	if err != nil {
-		return err
-	}
-
-	if !dbExists {
-		// If db didn't existed, then we need to create "expenses" table
-
-		fmt.Println("Database not found, creating new one...")
-
-		schemaFile := "db/create_table_expenses.sql"
-
-		createTableSQLBytes, err := os.ReadFile(schemaFile)
-		if err != nil {
-			return fmt.Errorf("failed to read schema file: %w", err)
-		}
-
-		_, err = db.Exec(string(createTableSQLBytes))
-		if err != nil {
-			return fmt.Errorf("failed to create table: %w", err)
-		}
-	}
-
-	app.db = db
 
 	return nil
 }
@@ -99,17 +66,41 @@ func (app *application) getApplicationDir() (string, error) {
 	return appDir, nil
 }
 
-func (app *application) getDatabasePath() (string, error) {
-	appDataDir, err := os.UserConfigDir() // Typically resolves to AppData\Roaming on Windows
-	if err != nil {
-		return "", err
-	}
-	appDir := filepath.Join(appDataDir, app.appName)
-	if err := os.MkdirAll(appDir, 0755); err != nil {
-		return "", err
-	}
+func (app *application) setupDatabase(appDir string) error {
 	dbPath := filepath.Join(appDir, app.dbName)
-	return dbPath, nil
+
+	_, err := os.Stat(dbPath)
+	dbExists := !os.IsNotExist(err)
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return err
+	}
+	err = db.Ping()
+	if err != nil {
+		return err
+	}
+
+	if !dbExists {
+		// If db didn't existed, then we need to create "expenses" table
+
+		app.infoLogger.Println("Database not found, creating new one...")
+
+		schemaFile := "db/create_table_expenses.sql"
+
+		createTableSQLBytes, err := os.ReadFile(schemaFile)
+		if err != nil {
+			return fmt.Errorf("failed to read schema file: %w", err)
+		}
+
+		_, err = db.Exec(string(createTableSQLBytes))
+		if err != nil {
+			return fmt.Errorf("failed to create table: %w", err)
+		}
+	}
+
+	app.db = db
+	return nil
 }
 
 func (app *application) setupLogger(appDir string) error {
