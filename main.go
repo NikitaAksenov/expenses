@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/NikitaAksenov/expenses/commands"
 
@@ -17,10 +20,23 @@ type application struct {
 	dbName  string
 
 	db *sql.DB
+
+	infoLogger  *log.Logger
+	infoLogFile *os.File
 }
 
 func (app *application) init() error {
-	fmt.Println("Init app", app.appName)
+	appDir, err := app.getApplicationDir()
+	if err != nil {
+		return err
+	}
+
+	err = app.setupLogger(appDir)
+	if err != nil {
+		return fmt.Errorf("failed to setup logger: %w", err)
+	}
+
+	app.infoLogger.Println("Init app", app.appName)
 
 	dbPath, err := app.getDatabasePath()
 	if err != nil {
@@ -60,14 +76,27 @@ func (app *application) init() error {
 
 	app.db = db
 
-	fmt.Println("Successfully inited app")
-
 	return nil
 }
 
 func (app *application) close() {
-	fmt.Println("Closing app", app.appName)
-	app.db.Close()
+	app.infoLogger.Println("Closing app", app.appName)
+
+	app.db.Close() // Close db
+
+	app.infoLogFile.Close() // Close infoLog file
+}
+
+func (app *application) getApplicationDir() (string, error) {
+	appDataDir, err := os.UserConfigDir() // Typically resolves to AppData\Roaming on Windows
+	if err != nil {
+		return "", err
+	}
+	appDir := filepath.Join(appDataDir, app.appName)
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		return "", err
+	}
+	return appDir, nil
 }
 
 func (app *application) getDatabasePath() (string, error) {
@@ -83,6 +112,30 @@ func (app *application) getDatabasePath() (string, error) {
 	return dbPath, nil
 }
 
+func (app *application) setupLogger(appDir string) error {
+	// Check log directory
+	logDir := filepath.Join(appDir, "log")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return err
+	}
+
+	// Create log file
+	timestamp := time.Now().Format("2006-01-02_15-04-05") // Format to YYYY-MM-DD_HH-MM-SS
+	logFileName := fmt.Sprintf("log_%s_%s.txt", app.appName, timestamp)
+	logFilePath := filepath.Join(logDir, logFileName)
+	var err error
+	app.infoLogFile, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+
+	// Init logger to file
+	multiWriter := io.MultiWriter(app.infoLogFile)
+	app.infoLogger = log.New(multiWriter, "", log.LstdFlags)
+
+	return nil
+}
+
 func main() {
 	app := &application{
 		appName: "expenses",
@@ -96,13 +149,14 @@ func main() {
 	}
 	defer app.close()
 
+	app.infoLogger.Println("Args:", os.Args[1:])
 	if len(os.Args) < 2 {
 		return
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-
 	args := os.Args[2:]
+
+	reader := bufio.NewReader(os.Stdin)
 
 	switch os.Args[1] {
 	case "add":
