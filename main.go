@@ -12,7 +12,7 @@ import (
 
 	"github.com/NikitaAksenov/expenses/commands"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type application struct {
@@ -72,7 +72,7 @@ func (app *application) setupDatabase(appDir string) error {
 	_, err := os.Stat(dbPath)
 	dbExists := !os.IsNotExist(err)
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}
